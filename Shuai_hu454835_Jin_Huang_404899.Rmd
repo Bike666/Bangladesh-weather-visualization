@@ -1,0 +1,457 @@
+---
+title: "Advanced visualisation in R"
+author: "Shuai Hu & Jin Huang"
+date: "2024"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 5
+    number_sections: false
+    theme: readable
+---
+
+
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+library(viridis)
+library(hrbrthemes)
+library(ggjoy)
+library(ggmosaic)
+library(reshape2)
+library(cowplot)
+library(magrittr)
+library(gridExtra)
+```
+
+
+```{r}
+weather_data <- read.csv("C:\\Users\\Lenovo\\OneDrive\\AAA Warsaw University\\The 3rd semester\\Advanced visualisation in R\\project\\Weather_Data.csv")
+```
+
+```{r}
+glimpse(weather_data)
+```
+```{r}
+weather_data$Date <- as.Date(weather_data$Date)
+#weather_data$Date <- as.Date(gsub("00", "", weather_data$Date), format = "%y-%M-%d")
+
+```
+
+
+
+```{r}
+
+
+subset_data <- weather_data[seq(1, nrow(weather_data), by = 50), ]
+
+
+top_max_temp <- subset_data[order(subset_data$MaxTemp, decreasing = TRUE), ][1, ]
+top_min_temp <- subset_data[order(subset_data$MinTemp), ][1, ]
+
+ggplot(subset_data, aes(x = Date)) +
+  geom_line(aes(y = MaxTemp, group = 1, color = "Max Temperature"), size = 0.5, linetype = 'solid') +
+  geom_line(aes(y = MinTemp, group = 1, color = "Min Temperature"), size = 0.5, linetype = 'solid') +
+  geom_smooth(aes(y = MaxTemp, color = "Max Temperature"), method = "loess", se = FALSE, linetype = 'dashed') +
+  geom_smooth(aes(y = MinTemp, color = "Min Temperature"), method = "loess", se = FALSE, linetype = 'dashed') +
+  labs(title = "Time Series Plot for Temperature",
+       x = 'Time',
+       y = "Temperature (°C)",
+       color = 'Colour') +
+  scale_x_date(date_breaks = "6 months", date_labels = "%Y-%m-%d") +
+  scale_color_manual(values = c("Max Temperature" = "red", "Min Temperature" = "blue")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_text(vjust = -0.5)) +
+  geom_text(data = top_max_temp, aes(x = Date, y = MaxTemp, label = paste("Max:", MaxTemp)), vjust = -1, hjust = -0.5, color = "red") +
+  geom_text(data = top_min_temp, aes(x = Date, y = MinTemp, label = paste("Min:", MinTemp)), vjust = 1, hjust = -0.5, color = "blue")
+
+
+
+```
+
+```{r}
+weather_data$Year <- lubridate::year(weather_data$Date)
+weather_data$Month <- lubridate::month(weather_data$Date)
+
+```
+
+
+
+```{r}
+
+# Summarize data
+monthly_avg_temp <- weather_data %>%
+  group_by(Year, Month) %>%
+  summarise(
+    Avg_MaxTemp = mean(MaxTemp, na.rm = TRUE),
+    Avg_MinTemp = mean(MinTemp, na.rm = TRUE)
+  )
+
+
+selected_years <- c(2013, 2017, 2021)
+
+# Plotting
+a <- ggplot(monthly_avg_temp, aes(Year, Avg_MaxTemp, colour = as.factor(Month))) +
+  geom_point(size = 0.3) +
+  geom_smooth(method = "loess") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  labs(title = "Monthly mean maximum temperature", subtitle = "Bangladesh: February 2013 - December 2021", y = "Temperature (°C)") +
+  scale_x_continuous(breaks = selected_years, labels = selected_years) +  # Set breaks and labels for the x-axis
+  facet_wrap(~Month) + NULL
+
+b <- ggplot(monthly_avg_temp, aes(Year, Avg_MinTemp, colour = as.factor(Month))) +
+  geom_point(size = 0.3) +
+  geom_smooth(method = "loess") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = "none")  +
+  labs(title = "Monthly mean minimum temperature", subtitle = "Bangladesh: February 2013 - December 2021") +
+  scale_x_continuous(breaks = selected_years, labels = selected_years) +  # Set breaks and labels for the x-axis
+  facet_wrap(~Month) + NULL
+
+grid.arrange(a, b, ncol = 2)
+
+#https://davetang.org/muse/2020/01/08/plotting-weather-data-using-r/
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+ggplot(weather_data, aes(x = Sunshine, y = as.factor(Month), fill = ..x..)) +
+  geom_density_ridges_gradient(
+    scale = 3,
+    rel_min_height = 0.01,
+    gradient_lwd = 1,
+    gradient_h = 12,
+    point_size = 10,
+    point_color = "black"
+  ) +
+  scale_fill_viridis(name = "Sunshine", option = "C", begin = 0, end = 1) +
+  labs(
+    title = 'Sunshine Distribution',
+    x = 'Sunshine Time (h)',
+    y = 'Month'
+  ) +
+  theme_ipsum() +
+  theme(
+    legend.position = "none",
+    panel.spacing = unit(0.1, "lines"),
+    strip.text.x = element_text(size = 8)
+  ) +
+  scale_x_continuous(limits = c(0, 13.6))  
+
+
+
+```
+
+
+```{r}
+
+
+ggplot(weather_data, aes(x = Sunshine, y = MaxTemp)) +
+  geom_point(color = "orange", size = 3, alpha = 0.7) +  
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +  
+  labs(title = "Scatter Plot of Sunshine and Max Temperature",
+       x = "Sunshine (h)",
+       y = "Max Temperature (°C)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  
+
+
+```
+
+
+```{r}
+
+summary_data <- weather_data %>%
+  group_by(RainToday) %>%
+  summarise(count = n())
+
+ggplot(summary_data, aes(x = "", y = count, fill = RainToday)) +
+  geom_bar(width = 1, stat = "identity", position = position_stack(vjust = 0.5)) +
+  geom_text(aes(label = scales::percent(count / sum(count)),
+                y = count),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y") +
+  labs(title = "Distribution of Rainy and Non-Rainy Days",
+       fill = "Rainy days") +
+  scale_fill_manual(values = c("grey", "lightblue"), labels = c("No", "Yes")) +
+  theme_minimal() +
+  theme(axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(rep(0, 4), "cm"),
+        plot.title = element_text(hjust = 0.5)) 
+```
+
+```{r}
+filtered_data <- weather_data %>%
+  filter(Year != 2022)
+
+
+annual_rainfall <- filtered_data %>%
+  group_by(Year) %>%
+  summarize(AnnualRainfall = round(sum(Rainfall, na.rm = TRUE)))
+
+
+ggplot(annual_rainfall, aes(x = as.factor(Year), y = AnnualRainfall, fill = AnnualRainfall)) +
+  geom_bar(stat = "identity", position = "dodge", color = "white", alpha = 0.7) +
+  geom_text(aes(label = AnnualRainfall), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5, size = 3) +
+  labs(title = "Rainfall Distribution by Year",
+       x = "Year",
+       y = "Rainfall (mm)",
+       fill = "Annual Rainfall") +
+  scale_fill_gradient(low = "lightblue", high = "blue") +  
+  scale_x_discrete(labels = annual_rainfall$Year) +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+
+
+selected_years <- c(2013, 2017, 2021)
+
+filtered_data <- weather_data %>%
+  filter(Year != 2022)
+
+monthly_avg_rainfall <- filtered_data %>%
+  group_by(Year, Month) %>%
+  summarise(
+    Avg_Rainfall = max(Rainfall, na.rm = TRUE)
+  )
+
+# Plotting for rainfall
+b <- ggplot(monthly_avg_rainfall, aes(Year, Avg_Rainfall, colour = as.factor(Month))) +
+  geom_point(size = 0.3) +
+  geom_smooth(method = "loess") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  labs(title = "Monthly Max rainfall", subtitle = "Bangladesh: February 2013 - December 2021", y = "Rainfall (mm)") +scale_x_continuous(breaks = selected_years, labels = selected_years) +  # Set breaks and labels for the x-axis
+  facet_wrap(~Month) + NULL
+  
+
+grid.arrange( b)
+
+
+```
+
+```{r}
+
+ggplot(weather_data) +
+  geom_violin(aes(x = "Humidity 3pm", y = Humidity3pm),
+              scale = "width",
+              width = 0.7,
+              fill = ("skyblue"),   #
+              color = "black",                   
+              alpha = 0.7) +
+  geom_violin(aes(x = "Humidity 9am", y = Humidity9am),
+              scale = "width",
+              width = 0.7,
+              fill = ("lightcoral"),
+              color = "black",                     # Set border color of the violins
+              alpha = 0.7)+
+   # Add text labels for the medians
+  geom_text(aes(x = "Humidity 3pm", y = median(Humidity3pm, na.rm = TRUE), label = round(median(Humidity3pm, na.rm = TRUE), 2)),
+            vjust = -0.5, color = "blue") +
+
+  geom_text(aes(x = "Humidity 9am", y = median(Humidity9am, na.rm = TRUE), label = round(median(Humidity9am, na.rm = TRUE), 2)),
+            vjust = -0.5, color = "red") +
+
+  labs(title = " Humidity of 9am and 3pm ",
+       x = "",
+       y = "Humidity (percent)") +
+
+  scale_fill_manual(values = c("Humidity 3pm" = "skyblue", "Humidity 9am" = "lightcoral")) +
+
+  theme_minimal()
+
+```
+
+
+
+```{r}
+filtered_data <- weather_data %>%
+  filter(Year != 2022)
+
+sum_data <- filtered_data %>%
+  group_by(Year) %>%
+  summarize(Cloud9am_Sum = sum(Cloud9am, na.rm = TRUE),
+            Cloud3pm_Sum = sum(Cloud3pm, na.rm = TRUE))
+
+df_long <- tidyr::pivot_longer(sum_data, cols = c("Cloud9am_Sum", "Cloud3pm_Sum"), names_to = "Category", values_to = "Cases")
+
+ggplot(df_long, aes(x = factor(Year), y = Cases, fill = Category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = Cases), position = position_stack(vjust = 1), color = "black", size = 3) +
+  # Customize plot appearance
+  labs(title = "Stacked Bar Plot of Clouds ",
+       x = "Year",
+       y = "Clouds",
+       fill = "Category") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme_minimal()
+```
+
+```{r}
+
+```
+
+
+
+
+
+```{r}
+library(ggplot2)
+
+
+ggplot(weather_data, aes(x = Rainfall, y = Cloud3pm + Cloud9am, color = Humidity9am + Humidity3pm)) +
+  geom_point() +
+  labs(title = "Relationship Between Rainfall, Cloud Cover, and Humidity",
+       x = "Rainfall",
+       y = "Cloud3pm + Cloud9am",
+       color = "Humidity9am + Humidity3pm") +
+  theme_minimal()
+
+```
+
+
+```{r}
+library(ggplot2)
+
+
+wind_dir_counts <- table(weather_data$WindDir9am)
+
+
+wind_dir_data <- data.frame(
+  WindDirection = names(wind_dir_counts),
+  Count = as.numeric(wind_dir_counts)
+)
+
+
+ggplot(wind_dir_data, aes(x = WindDirection, y = Count, fill = WindDirection)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Distribution of Wind Directions (9am)",
+       x = "Wind Direction",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+```{r}
+
+
+ggplot(weather_data, aes(x = WindGustDir, y = WindGustSpeed)) +
+  stat_summary(fun = "mean", geom = "bar", fill = "skyblue") +
+  labs(title = "Average Wind Gust Speed by Direction",
+       x = "Wind Direction",
+       y = "Average Wind Gust Speed (km/h)") +
+  theme_minimal() +
+  coord_polar(start = 0) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_text(hjust = 0.5))  
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+ggplot(weather_data, aes(x = WindGustDir, y = WindGustSpeed)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Wind Gust Speed by Direction",
+       x = "Wind Direction",
+       y = "Wind Gust Speed (km/h)") +
+  theme_minimal() +
+  coord_polar(start = 0) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.y = element_text(hjust = 0.5))  
+
+
+
+```
+
+
+
+
+```{r}
+
+
+```
+
+
+
+```{r}
+
+
+filtered_data <- weather_data %>%
+  filter(Year != 2013 & Year != 2014)
+
+ggplot(filtered_data, aes(x = ((Pressure9am + Pressure3pm)/2), y = WindGustSpeed, color = WindGustSpeed)) +
+  geom_point(size = 3, alpha = 0.7) +  # Customize point aesthetics
+  labs(title = "Relationship Between WindGustSpeed and Pressure",
+       x = "Pressure (hectopascals)",
+       y = "WindGustSpeed (kilometers per hour)") +
+  facet_wrap(~Year, scales = "free") +  # Create facets for each year
+  scale_color_gradient(low = "lightblue", high = "blue") +  # Change color based on WindGustSpeed
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Center the title
+        axis.title = element_text(face = "bold"),  # Bold axis titles
+        panel.grid = element_blank(),  # Remove grid lines
+        axis.text.x = element_text(size = 8))  # Adjust the size of x-axis text
+
+
+
+```
+
+
+
+
+
+
+
+```{r}
+
+
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+
+
+
+```{r}
+
+```
